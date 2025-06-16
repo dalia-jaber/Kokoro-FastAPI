@@ -11,6 +11,7 @@ from ...structures.schemas import NormalizationOptions
 from .normalizer import normalize_text
 from .phonemizer import phonemize
 from .vocabulary import tokenize
+from .pronunciation_dict import apply_pronunciations
 
 # Pre-compiled regex patterns for performance
 # Updated regex to be more strict and avoid matching isolated brackets
@@ -37,9 +38,12 @@ def process_text_chunk(
     
     # Strip input text to remove any leading/trailing spaces that could cause artifacts
     text = text.strip()
-    
+
     if not text:
         return []
+
+    # Replace words with custom pronunciations if available
+    text = apply_pronunciations(text)
 
     if skip_phonemize:
         # Input is already phonemes, just tokenize

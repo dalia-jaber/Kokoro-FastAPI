@@ -39,3 +39,10 @@ class GenerateFromPhonemesRequest(BaseModel):
 
     phonemes: str = Field(..., description="Phoneme string to synthesize")
     voice: str = Field(..., description="Voice ID to use for generation")
+
+
+class PronunciationUpdateRequest(BaseModel):
+    """Request model for updating pronunciation dictionary"""
+
+    word: str = Field(..., description="Word to update")
+    phonemes: str = Field(..., description="Phoneme representation of the word")

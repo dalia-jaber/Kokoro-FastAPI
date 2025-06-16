@@ -18,6 +18,10 @@ from ..services.audio import AudioNormalizer, AudioService
 from ..services.streaming_audio_writer import StreamingAudioWriter
 from ..services.temp_manager import TempFileWriter
 from ..services.text_processing import smart_split
+from ..services.text_processing.pronunciation_dict import (
+    update_pronunciation,
+    get_pronunciations,
+)
 from ..services.tts_service import TTSService
 from ..structures import CaptionedSpeechRequest, CaptionedSpeechResponse, WordTimestamp
 from ..structures.custom_responses import JSONStreamingResponse
@@ -25,6 +29,7 @@ from ..structures.text_schemas import (
     GenerateFromPhonemesRequest,
     PhonemeRequest,
     PhonemeResponse,
+    PronunciationUpdateRequest,
 )
 from .openai_compatible import process_and_validate_voices, stream_audio_chunks
 
@@ -156,6 +161,22 @@ async def generate_from_phonemes(
                 "type": "server_error",
             },
         )
+
+
+@router.post("/dev/update_pronunciation")
+async def add_pronunciation(entry: PronunciationUpdateRequest):
+    """Add or update a word pronunciation in the runtime dictionary"""
+    try:
+        update_pronunciation(entry.word, entry.phonemes)
+        return {"status": "ok"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/dev/pronunciations")
+async def list_pronunciations() -> dict[str, str]:
+    """Return the current pronunciation dictionary"""
+    return get_pronunciations()
 
 
 @router.post("/dev/captioned_speech")
