@@ -16,7 +16,7 @@ from .base import AudioChunk, BaseModelBackend
 
 import json
 
-
+PRONUNCIATIONS_DICT_PATH = os.getenv("PRONUNCIATIONS_DICT_PATH", "/app/api/pronunciations.json")
 
 class KokoroV1(BaseModelBackend):
     """Kokoro backend with controlled resource management."""
@@ -87,8 +87,9 @@ class KokoroV1(BaseModelBackend):
             )
             #DJ
             # Open and read the JSON file
-            with open('/app/api/pronunciations.json', 'r') as file:
+            with open(PRONUNCIATIONS_DICT_PATH, 'r') as file:
                 phoneme_json = json.load(file)
+
             self._pipelines[lang_code].g2p.lexicon.golds['CEM'] = 'C P Q'
             for item, phoneme in phoneme_json.items():
                 self._pipelines[lang_code].g2p.lexicon.golds[item] = phoneme

@@ -2,7 +2,7 @@ import json
 import os
 import re
 
-DICT_PATH = os.getenv("PRONUNCIATION_DICT_PATH", "/app/api/pronunciations.json")
+PRONUNCIATIONS_DICT_PATH = os.getenv("PRONUNCIATION_DICT_PATH", "/app/api/pronunciations.json")
 
 _pronunciations: dict[str, str] = {}
 
@@ -10,9 +10,9 @@ _pronunciations: dict[str, str] = {}
 def load_pronunciations() -> None:
     """Load pronunciation dictionary from disk if available."""
     global _pronunciations
-    if os.path.exists(DICT_PATH):
+    if os.path.exists(PRONUNCIATIONS_DICT_PATH):
         try:
-            with open(DICT_PATH, "r", encoding="utf-8") as f:
+            with open(PRONUNCIATIONS_DICT_PATH, "r", encoding="utf-8") as f:
                 _pronunciations = json.load(f)
         except Exception:
             _pronunciations = {}
@@ -22,7 +22,7 @@ def load_pronunciations() -> None:
 
 def save_pronunciations() -> None:
     """Persist pronunciation dictionary to disk."""
-    with open(DICT_PATH, "w", encoding="utf-8") as f:
+    with open(PRONUNCIATIONS_DICT_PATH, "w", encoding="utf-8") as f:
         json.dump(_pronunciations, f, ensure_ascii=False, indent=2)
 
 
