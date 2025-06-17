@@ -14,6 +14,9 @@ from ..core.model_config import model_config
 from ..structures.schemas import WordTimestamp
 from .base import AudioChunk, BaseModelBackend
 
+import json
+
+
 
 class KokoroV1(BaseModelBackend):
     """Kokoro backend with controlled resource management."""
@@ -82,6 +85,13 @@ class KokoroV1(BaseModelBackend):
             self._pipelines[lang_code] = KPipeline(
                 lang_code=lang_code, model=self._model, device=self._device
             )
+            #DJ
+            # Open and read the JSON file
+            with open('/app/api/pronunciations.json', 'r') as file:
+                phoneme_json = json.load(file)
+            self._pipelines[lang_code].g2p.lexicon.golds['CEM'] = 'C P Q'
+            for item, phoneme in phoneme_json.items():
+                self._pipelines[lang_code].g2p.lexicon.golds[item] = phoneme
         return self._pipelines[lang_code]
 
     async def generate_from_tokens(

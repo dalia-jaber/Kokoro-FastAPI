@@ -4,7 +4,7 @@ from datetime import datetime
 
 import psutil
 import torch
-from fastapi import APIRouter
+from fastapi import APIRouter,HTTPException
 
 try:
     import GPUtil
@@ -207,3 +207,37 @@ async def get_session_pool_info():
                 pass
 
     return pool_info
+
+
+
+
+@router.post("/debug/reinitialize")
+async def reinitialize_model():
+    """Unload and reinitialize the Kokoro V1 model."""
+    from ..inference.model_manager import get_manager as get_model_manager
+    from ..inference.voice_manager import get_manager as get_voice_manager
+
+    try:
+        model_manager = await get_model_manager()
+        voice_manager = await get_voice_manager()
+
+        # Unload existing model state
+        model_manager.unload_all()
+
+        # Reinitialize and warm up model
+        device, model, voice_count = await model_manager.initialize_with_warmup(
+            voice_manager
+        )
+
+        # model_manager.get_pipeline('a')
+        return {
+            "status": "ok",
+            "device": device,
+            "model": model,
+            "voice_packs": voice_count,
+        }
+    except Exception as e:  # pragma: no cover - safeguard
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "reinitialize_failed", "message": str(e)},
+        ) from e

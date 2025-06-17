@@ -2,7 +2,7 @@ import json
 import os
 import re
 
-DICT_PATH = os.getenv("PRONUNCIATION_DICT_PATH", "pronunciations.json")
+DICT_PATH = os.getenv("PRONUNCIATION_DICT_PATH", "/app/api/pronunciations.json")
 
 _pronunciations: dict[str, str] = {}
 
