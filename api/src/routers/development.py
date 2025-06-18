@@ -21,6 +21,7 @@ from ..services.text_processing import smart_split
 from ..services.text_processing.pronunciation_dict import (
     update_pronunciation,
     get_pronunciations,
+    delete_pronunciation,
 )
 from ..services.tts_service import TTSService
 from ..structures import CaptionedSpeechRequest, CaptionedSpeechResponse, WordTimestamp
@@ -178,6 +179,14 @@ async def list_pronunciations() -> dict[str, str]:
     """Return the current pronunciation dictionary"""
     return get_pronunciations()
 
+@router.delete("/dev/pronunciation/{word}")
+async def remove_pronunciation(word: str):
+    """Delete a word pronunciation from the runtime dictionary"""
+    try:
+        delete_pronunciation(word)
+        return {"status": "ok"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/dev/captioned_speech")
 async def create_captioned_speech(

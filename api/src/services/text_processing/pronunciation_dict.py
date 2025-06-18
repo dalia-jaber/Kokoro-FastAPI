@@ -39,6 +39,15 @@ def update_pronunciation(word: str, phonemes: str) -> None:
     save_pronunciations()
 
 
+def delete_pronunciation(word: str) -> None:
+    """Remove a word pronunciation from the dictionary and save."""
+    if not word:
+        raise ValueError("Word must be provided")
+    lowered = word.lower()
+    if lowered in _pronunciations:
+        del _pronunciations[lowered]
+        save_pronunciations()
+
 def apply_pronunciations(text: str) -> str:
     """Apply dictionary pronunciations using custom phoneme syntax."""
     if not _pronunciations:
