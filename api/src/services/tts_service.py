@@ -22,6 +22,8 @@ from .audio import AudioNormalizer, AudioService
 from .streaming_audio_writer import StreamingAudioWriter
 from .text_processing import tokenize
 from .text_processing.text_processor import process_text_chunk, smart_split
+from .metrics import TTSMetrics
+import uuid
 
 
 class TTSService:
@@ -35,6 +37,7 @@ class TTSService:
         self.output_dir = output_dir
         self.model_manager = None
         self._voice_manager = None
+        self._metrics_callbacks = []
 
     @classmethod
     async def create(cls, output_dir: str = None) -> "TTSService":
@@ -43,6 +46,11 @@ class TTSService:
         service.model_manager = await get_model_manager()
         service._voice_manager = await get_voice_manager()
         return service
+
+    def add_metrics_callback(self, cb):
+        """Register a callback to receive TTSMetrics."""
+        if callable(cb):
+            self._metrics_callbacks.append(cb)
 
     async def _process_chunk(
         self,
@@ -261,11 +269,16 @@ class TTSService:
         lang_code: Optional[str] = None,
         normalization_options: Optional[NormalizationOptions] = NormalizationOptions(),
         return_timestamps: Optional[bool] = False,
+        request_id: Optional[str] = None,
     ) -> AsyncGenerator[AudioChunk, None]:
         """Generate and stream audio chunks."""
         stream_normalizer = AudioNormalizer()
         chunk_index = 0
         current_offset = 0.0
+        start_time = time.perf_counter()
+        ttfb: Optional[float] = None
+        audio_duration = 0.0
+        req_id = request_id or uuid.uuid4().hex
         try:
             # Get backend
             backend = self.model_manager.get_backend()
@@ -335,6 +348,8 @@ class TTSService:
                             lang_code=pipeline_lang_code,  # Pass lang_code
                             return_timestamps=return_timestamps,
                         ):
+                            if ttfb is None:
+                                ttfb = time.perf_counter() - start_time
                             if chunk_data.word_timestamps is not None:
                                 for timestamp in chunk_data.word_timestamps:
                                     timestamp.start_time += current_offset
@@ -345,6 +360,7 @@ class TTSService:
                             if chunk_data.audio is not None and len(chunk_data.audio) > 0:
                                 chunk_duration = len(chunk_data.audio) / 24000
                                 current_offset += chunk_duration
+                                audio_duration += chunk_duration
 
                             # Yield the processed chunk (either formatted or raw)
                             if chunk_data.output is not None:
@@ -388,6 +404,21 @@ class TTSService:
         except Exception as e:
             logger.error(f"Error in phoneme audio generation: {str(e)}")
             raise e
+        finally:
+            duration = time.perf_counter() - start_time
+            metrics = TTSMetrics(
+                request_id=req_id,
+                timestamp=time.time(),
+                ttfb=ttfb if ttfb is not None else -1.0,
+                duration=duration,
+                audio_duration=audio_duration,
+                characters_count=len(text),
+            )
+            for cb in self._metrics_callbacks:
+                try:
+                    cb(metrics)
+                except Exception as cb_err:
+                    logger.error(f"Metrics callback error: {cb_err}")
 
     async def generate_audio(
         self,

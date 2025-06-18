@@ -333,6 +333,27 @@ Key Streaming Metrics:
 *Note: Artifacts in intonation can increase with smaller chunks*
 </details>
 
+<details>
+<summary>Metrics Evaluation</summary>
+
+Use the included `metrics_agent.py` script to evaluate speech metrics such as
+time to first byte and audio duration. The agent relies on
+[LiveKit](https://github.com/livekit/livekit) and connects to the local Kokoro
+service through the OpenAI‑compatible API.
+
+```bash
+python metrics_agent.py
+```
+
+Metrics for the LLM, STT and TTS pipeline stages will be printed to the console
+while interacting with the agent.
+
+The API now emits an `X-Request-ID` header for every speech request, allowing
+client libraries like LiveKit to associate server responses with collected
+metrics.
+
+</details>
+
 ## Processing Details
 <details>
 <summary>Performance Benchmarks</summary>
