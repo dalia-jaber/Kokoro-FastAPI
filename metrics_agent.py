@@ -29,6 +29,8 @@ class MetricsAgent(Agent):
             base_url="http://localhost:8880/v1",
             instructions="you should be able to read acronyms",
         )
+        if isinstance(tts, tuple):
+            tts = tts[0]
         vad = silero.VAD.load()
         turn_detection = MultilingualModel()
 

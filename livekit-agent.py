@@ -24,8 +24,13 @@ class MetricsAgent(Agent):
         stt = openai.STT(model="gpt-4o-mini-transcribe", language="en")
         llm = openai.LLM(model="gpt-4o-mini")
         # tts = openai.TTS()
-        tts = openai.TTS(model='kokoro', base_url='http://localhost:8880/v1',
-                         instructions='you should be able to read acronyms'),
+        tts = openai.TTS(
+            model='kokoro',
+            base_url='http://localhost:8880/v1',
+            instructions='you should be able to read acronyms'
+        )
+        if isinstance(tts, tuple):
+            tts = tts[0]
         vad = silero.VAD.load()
         turn_detection = MultilingualModel()
 
