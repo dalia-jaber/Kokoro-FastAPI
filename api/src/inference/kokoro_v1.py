@@ -61,7 +61,7 @@ class KokoroV1(BaseModelBackend):
                 self._model = self._model.cpu()
 
         except FileNotFoundError as e:
-            raise e
+            raise RuntimeError(f"Failed to load Kokoro model: {e}") from e
         except Exception as e:
             raise RuntimeError(f"Failed to load Kokoro model: {e}")
 
