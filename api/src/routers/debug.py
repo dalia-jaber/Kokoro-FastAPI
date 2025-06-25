@@ -4,7 +4,8 @@ from datetime import datetime
 
 import psutil
 import torch
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 try:
     import GPUtil
@@ -207,3 +208,63 @@ async def get_session_pool_info():
                 pass
 
     return pool_info
+
+
+@router.post("/debug/reinitialize")
+async def reinitialize_model():
+    """Unload and reinitialize the Kokoro V1 model."""
+    from ..inference.model_manager import get_manager as get_model_manager
+    from ..inference.voice_manager import get_manager as get_voice_manager
+
+    try:
+        model_manager = await get_model_manager()
+        voice_manager = await get_voice_manager()
+
+        # Unload existing model state
+        model_manager.unload_all()
+
+        # Reinitialize and warm up model
+        device, model, voice_count = await model_manager.initialize_with_warmup(
+            voice_manager
+        )
+
+        return {
+            "status": "ok",
+            "device": device,
+            "model": model,
+            "voice_packs": voice_count,
+        }
+    except Exception as e:  # pragma: no cover - safeguard
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "reinitialize_failed", "message": str(e)},
+        ) from e
+
+
+class VoiceRequest(BaseModel):
+    """Request body for voice update."""
+
+    voice: str
+
+
+@router.post("/debug/voice")
+async def set_default_voice(request: VoiceRequest):
+    """Set the default voice used by the service."""
+    from ..core.config import settings
+    from ..inference.voice_manager import get_manager as get_voice_manager
+
+    manager = await get_voice_manager()
+    available = await manager.list_voices()
+    if request.voice not in available:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "voice_not_found",
+                "message": f"Voice '{request.voice}' not found",
+            },
+        )
+
+    settings.default_voice = request.voice
+    settings.default_voice_code = request.voice[0].lower()
+
+    return {"status": "ok", "voice": request.voice}
