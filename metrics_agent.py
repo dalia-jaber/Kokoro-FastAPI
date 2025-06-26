@@ -25,9 +25,9 @@ class MetricsAgent(Agent):
         llm = openai.LLM(model="gpt-4o-mini")
         # tts = openai.TTS()
         tts = openai.TTS(
-            model='kokoro',
-            base_url='http://localhost:8880/v1',
-            instructions='you should be able to read acronyms'
+            model="kokoro",
+            base_url="http://localhost:8880/v1",
+            instructions="you should be able to read acronyms",
         )
         if isinstance(tts, tuple):
             tts = tts[0]

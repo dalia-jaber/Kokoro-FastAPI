@@ -4,6 +4,7 @@ import io
 import json
 import os
 import re
+import uuid
 import tempfile
 from typing import AsyncGenerator, Dict, List, Tuple, Union, Literal
 from urllib import response
@@ -193,6 +194,8 @@ async def stream_audio_chunks(
     if hasattr(request, "return_timestamps"):
         unique_properties["return_timestamps"] = request.return_timestamps
 
+    request_id = uuid.uuid4().hex
+
     try:
         async for chunk_data in tts_service.generate_audio_stream(
             text=request.input,
@@ -203,6 +206,7 @@ async def stream_audio_chunks(
             lang_code=request.lang_code,
             normalization_options=request.normalization_options,
             return_timestamps=unique_properties["return_timestamps"],
+            request_id=request_id,
         ):
             # Check if client is still connected
             is_disconnected = client_request.is_disconnected
@@ -290,6 +294,7 @@ async def create_speech(
                     "Cache-Control": "no-cache",
                     "Transfer-Encoding": "chunked",
                     "X-Download-Path": download_path,
+                    "X-Request-ID": request_id,
                 }
 
                 # Add header to indicate if temp file writing is available
@@ -345,12 +350,14 @@ async def create_speech(
                     "X-Accel-Buffering": "no",
                     "Cache-Control": "no-cache",
                     "Transfer-Encoding": "chunked",
+                    "X-Request-ID": request_id,
                 },
             )
         else:
             headers = {
                 "Content-Disposition": f"attachment; filename=speech.{request.response_format}",
                 "Cache-Control": "no-cache",  # Prevent caching
+                "X-Request-ID": request_id,
             }
 
             # Generate complete audio using public interface
