@@ -7,10 +7,12 @@ from typing import AsyncGenerator, List, Tuple, Union
 
 import numpy as np
 import torch
+import yaml
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from kokoro import KPipeline
 from loguru import logger
+from pydantic import BaseModel, Field
 
 from ..core.config import settings
 from ..inference.base import AudioChunk
@@ -25,7 +27,7 @@ from ..services.text_processing.pronunciation_dict import (
 )
 
 from ..routers.debug import reinitialize_model
-from ..services.tts_service import TTSService
+from ..services.tts_service import TTSService, CONFIG_YAML_FILE
 from ..structures import CaptionedSpeechRequest, CaptionedSpeechResponse, WordTimestamp
 from ..structures.custom_responses import JSONStreamingResponse
 from ..structures.text_schemas import (
@@ -41,6 +43,15 @@ from .openai_compatible import (
     stream_audio_chunks,
     SpeechBaseUpdate,
 )
+
+class ConfigUpdate(BaseModel):
+    """Request model to update config.yaml values."""
+
+    voice: str | None = None
+    speed: float | None = Field(default=None, ge=0.25, le=4.0)
+    lang_code: str | None = Field(default=None, min_length=1, max_length=2)
+
+
 router = APIRouter(tags=["text processing"])
 
 
@@ -451,21 +462,41 @@ async def create_captioned_speech(
             },
         )
 
+@router.post("/dev/set_current_model")
+async def update_tts_config(
+    config: ConfigUpdate, tts_service: TTSService = Depends(get_tts_service)
+) -> dict:
+    """Update voice, speed, and lang_code in config.yaml."""
 
-@router.post("/dev/speech/config/base")
-async def dev_update_speech_base(config: SpeechBaseUpdate):
-    """Update base speech configuration (model, voice, speed)."""
-    update = config.model_dump(exclude_none=True)
-    prev_model = openai_compatible.speech_config.model
-    openai_compatible.speech_config = openai_compatible.speech_config.model_copy(update=update)
-    if "model" in update and update["model"] != prev_model:
-        await openai_compatible._reinitialize_model()
-    return {"status": "updated", "config": openai_compatible.speech_config.model_dump()}
+    # Validate voice if provided
+    if config.voice is not None:
+        available_voices = await tts_service.list_voices()
+        if config.voice not in available_voices:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Voice '{config.voice}' not found. Available voices: {', '.join(sorted(available_voices))}",
+            )
+    lang_list = ['a', 'b' 'e', 'f', 'h', 'i', 'p', 'j', 'z']
+    if config.lang_code not in lang_list:
+        raise HTTPException(status_code=400, detail="('en', {'a': 'American English', 'b': 'British English', \
+        'e': 'es', 'f': 'fr-fr', 'h': 'hi', 'i': 'it', 'p': 'pt-br',\
+         'j': 'Japanese', 'z': 'Mandarin Chinese'})")
 
+    # Load existing config
+    try:
+        with open(CONFIG_YAML_FILE, "r", encoding="utf8") as f:
+            current = yaml.safe_load(f) or {}
+    except FileNotFoundError:
+        current = {}
 
-# @router.post("/dev/speech/config/advanced")
-# async def dev_update_speech_advanced(config: SpeechAdvancedUpdate):
-#     """Update advanced speech configuration."""
-#     update = config.model_dump(exclude_none=True)
-#     openai_compatible.speech_config = openai_compatible.speech_config.model_copy(update=update)
-#     return {"status": "updated", "config": openai_compatible.speech_config.model_dump()}
+    if config.voice is not None:
+        current["voice"] = config.voice
+    if config.speed is not None:
+        current["speed"] = config.speed
+    if config.lang_code is not None:
+        current["lang_code"] = config.lang_code.lower()
+
+    with open(CONFIG_YAML_FILE, "w", encoding="utf8") as f:
+        yaml.safe_dump(current, f)
+
+    return {"status": "updated", "config": current}
