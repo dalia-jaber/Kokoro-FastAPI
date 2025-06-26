@@ -211,7 +211,7 @@ async def get_session_pool_info():
 
 
 
-@router.post("/debug/reinitialize")
+# @router.post("/debug/reinitialize")
 async def reinitialize_model():
     """Unload and reinitialize the Kokoro V1 model."""
     from ..inference.model_manager import get_manager as get_model_manager

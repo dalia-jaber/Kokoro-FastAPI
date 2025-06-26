@@ -93,6 +93,7 @@ class KokoroV1(BaseModelBackend):
             self._pipelines[lang_code].g2p.lexicon.golds['CEM'] = 'C P Q'
             for item, phoneme in phoneme_json.items():
                 self._pipelines[lang_code].g2p.lexicon.golds[item] = phoneme
+
         return self._pipelines[lang_code]
 
     async def generate_from_tokens(

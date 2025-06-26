@@ -23,6 +23,8 @@ from ..services.text_processing.pronunciation_dict import (
     get_pronunciations,
     delete_pronunciation,
 )
+
+from ..routers.debug import reinitialize_model
 from ..services.tts_service import TTSService
 from ..structures import CaptionedSpeechRequest, CaptionedSpeechResponse, WordTimestamp
 from ..structures.custom_responses import JSONStreamingResponse
@@ -169,6 +171,7 @@ async def add_pronunciation(entry: PronunciationUpdateRequest):
     """Add or update a word pronunciation in the runtime dictionary"""
     try:
         update_pronunciation(entry.word, entry.phonemes)
+        await reinitialize_model()
         return {"status": "ok"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -184,6 +187,8 @@ async def remove_pronunciation(word: str):
     """Delete a word pronunciation from the runtime dictionary"""
     try:
         delete_pronunciation(word)
+        await reinitialize_model()
+
         return {"status": "ok"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
