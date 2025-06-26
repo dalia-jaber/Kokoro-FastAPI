@@ -1,7 +1,6 @@
 import torch
 from pydantic_settings import BaseSettings
 
-
 class Settings(BaseSettings):
     # API Settings
     api_title: str = "Kokoro TTS API"

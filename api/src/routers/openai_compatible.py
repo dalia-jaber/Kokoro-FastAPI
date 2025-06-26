@@ -5,7 +5,7 @@ import json
 import os
 import re
 import tempfile
-from typing import AsyncGenerator, Dict, List, Tuple, Union
+from typing import AsyncGenerator, Dict, List, Tuple, Union, Literal
 from urllib import response
 
 import aiofiles
@@ -49,6 +49,43 @@ router = APIRouter(
 # Global TTSService instance with lock
 _tts_service = None
 _init_lock = None
+
+from pydantic import BaseModel, Field
+
+class SpeechConfig(BaseModel):
+    """Global configuration for the speech endpoint."""
+
+    model: str = "kokoro"
+    voice: str = "af_heart"
+    response_format: Literal["mp3", "opus", "aac", "flac", "wav", "pcm"] = "mp3"
+    download_format: Literal["mp3", "opus", "aac", "flac", "wav", "pcm"] | None = "mp3"
+    speed: float = 1.0
+    stream: bool = True
+    return_download_link: bool = False
+    lang_code: str | None = None
+
+
+class SpeechBaseUpdate(BaseModel):
+    model: str | None = None
+    voice: str | None = None
+    speed: float | None = Field(default=None, ge=0.25, le=4.0)
+
+speech_config = SpeechConfig()
+
+
+async def _reinitialize_model() -> None:
+    """Reinitialize the Kokoro model and reset the service."""
+    global _tts_service
+    from ..inference.model_manager import get_manager as get_model_manager
+    from ..inference.voice_manager import get_manager as get_voice_manager
+
+    model_manager = await get_model_manager()
+    voice_manager = await get_voice_manager()
+    model_manager.unload_all()
+    await model_manager.initialize_with_warmup(voice_manager)
+    _tts_service = None
+
+
 
 
 async def get_tts_service() -> TTSService:

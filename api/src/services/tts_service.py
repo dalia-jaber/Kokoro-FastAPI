@@ -8,6 +8,7 @@ import time
 from typing import AsyncGenerator, List, Optional, Tuple, Union
 
 import numpy as np
+import yaml
 import torch
 from kokoro import KPipeline
 from loguru import logger
@@ -23,7 +24,7 @@ from .streaming_audio_writer import StreamingAudioWriter
 from .text_processing import tokenize
 from .text_processing.text_processor import process_text_chunk, smart_split
 
-
+CONFIG_YAML_FILE = '/app/api/src/core/config.yaml'
 class TTSService:
     """Text-to-speech service."""
 
@@ -269,6 +270,15 @@ class TTSService:
         try:
             # Get backend
             backend = self.model_manager.get_backend()
+
+            #DJ - Voice and Speed can only be set in config.yaml file
+            logger.debug("Collecting Values from config.yaml ...")
+            with open(CONFIG_YAML_FILE, 'r', encoding='utf8') as file:
+                voice_map = yaml.safe_load(file)
+            voice = voice_map['voice']
+            speed = voice_map['speed']
+            lang_code = voice_map['lang_code']
+            logger.debug(f" Voice set: {voice}")
 
             # Get voice path, handling combined voices
             voice_name, voice_path = await self._get_voices_path(voice)
