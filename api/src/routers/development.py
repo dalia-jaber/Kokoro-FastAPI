@@ -34,7 +34,13 @@ from ..structures.text_schemas import (
     PhonemeResponse,
     PronunciationUpdateRequest,
 )
-from .openai_compatible import process_and_validate_voices, stream_audio_chunks
+from . import openai_compatible
+from .openai_compatible import (
+    process_and_validate_voices,
+    stream_audio_chunks,
+    SpeechBaseUpdate,
+    SpeechAdvancedUpdate,
+)
 
 router = APIRouter(tags=["text processing"])
 
@@ -428,20 +434,22 @@ async def create_captioned_speech(
                 "type": "server_error",
             },
         )
-    except Exception as e:
-        # Handle unexpected errors
-        logger.error(f"Unexpected error in captioned speech generation: {str(e)}")
 
-        try:
-            writer.close()
-        except:
-            pass
 
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "processing_error",
-                "message": str(e),
-                "type": "server_error",
-            },
-        )
+@router.post("/dev/speech/config/base")
+async def dev_update_speech_base(config: SpeechBaseUpdate):
+    """Update base speech configuration (model, voice, speed)."""
+    update = config.model_dump(exclude_none=True)
+    prev_model = openai_compatible.speech_config.model
+    openai_compatible.speech_config = openai_compatible.speech_config.model_copy(update=update)
+    if "model" in update and update["model"] != prev_model:
+        await openai_compatible._reinitialize_model()
+    return {"status": "updated", "config": openai_compatible.speech_config.model_dump()}
+
+
+@router.post("/dev/speech/config/advanced")
+async def dev_update_speech_advanced(config: SpeechAdvancedUpdate):
+    """Update advanced speech configuration."""
+    update = config.model_dump(exclude_none=True)
+    openai_compatible.speech_config = openai_compatible.speech_config.model_copy(update=update)
+    return {"status": "updated", "config": openai_compatible.speech_config.model_dump()}

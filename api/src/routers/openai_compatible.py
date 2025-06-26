@@ -5,7 +5,7 @@ import json
 import os
 import re
 import tempfile
-from typing import AsyncGenerator, Dict, List, Tuple, Union
+from typing import AsyncGenerator, Dict, List, Tuple, Union, Literal
 from urllib import response
 
 import aiofiles
@@ -15,13 +15,15 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from loguru import logger
 
+from pydantic import BaseModel, Field
+
 from ..core.config import settings
 from ..inference.base import AudioChunk
 from ..services.audio import AudioService
 from ..services.streaming_audio_writer import StreamingAudioWriter
 from ..services.tts_service import TTSService
 from ..structures import OpenAISpeechRequest
-from ..structures.schemas import CaptionedSpeechRequest
+from ..structures.schemas import CaptionedSpeechRequest, NormalizationOptions
 
 
 # Load OpenAI mappings
@@ -51,6 +53,51 @@ _tts_service = None
 _init_lock = None
 
 
+class SpeechConfig(BaseModel):
+    """Global configuration for the speech endpoint."""
+
+    model: str = "kokoro"
+    voice: str = "af_heart"
+    response_format: Literal["mp3", "opus", "aac", "flac", "wav", "pcm"] = "mp3"
+    download_format: Literal["mp3", "opus", "aac", "flac", "wav", "pcm"] | None = "mp3"
+    speed: float = 1.0
+    stream: bool = True
+    return_download_link: bool = False
+    lang_code: str | None = None
+    normalization_options: NormalizationOptions = NormalizationOptions()
+
+
+class SpeechBaseUpdate(BaseModel):
+    model: str | None = None
+    voice: str | None = None
+    speed: float | None = Field(default=None, ge=0.25, le=4.0)
+
+
+class SpeechAdvancedUpdate(BaseModel):
+    response_format: Literal["mp3", "opus", "aac", "flac", "wav", "pcm"] | None = None
+    download_format: Literal["mp3", "opus", "aac", "flac", "wav", "pcm"] | None = None
+    stream: bool | None = None
+    return_download_link: bool | None = None
+    lang_code: str | None = None
+    normalization_options: NormalizationOptions | None = None
+
+
+speech_config = SpeechConfig()
+
+
+async def _reinitialize_model() -> None:
+    """Reinitialize the Kokoro model and reset the service."""
+    global _tts_service
+    from ..inference.model_manager import get_manager as get_model_manager
+    from ..inference.voice_manager import get_manager as get_voice_manager
+
+    model_manager = await get_model_manager()
+    voice_manager = await get_voice_manager()
+    model_manager.unload_all()
+    await model_manager.initialize_with_warmup(voice_manager)
+    _tts_service = None
+
+
 async def get_tts_service() -> TTSService:
     """Get global TTSService instance"""
     global _tts_service, _init_lock
@@ -78,6 +125,8 @@ def get_model_name(model: str) -> str:
     if not base_name:
         raise ValueError(f"Unsupported model: {model}")
     return base_name + ".pth"
+
+
 
 
 async def process_and_validate_voices(
@@ -177,6 +226,16 @@ async def create_speech(
     x_raw_response: str = Header(None, alias="x-raw-response"),
 ):
     """OpenAI-compatible endpoint for text-to-speech"""
+    # Apply global defaults for any missing fields
+    try:
+        raw = await client_request.json()
+    except Exception:
+        raw = {}
+    defaults = speech_config.model_dump()
+    for key, value in defaults.items():
+        if key not in raw:
+            setattr(request, key, value)
+
     # Validate model before processing request
     if request.model not in _openai_mappings["models"]:
         raise HTTPException(
